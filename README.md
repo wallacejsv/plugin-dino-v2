@@ -1,4 +1,4 @@
-# plugin-dino-v2
-Consumir notícias do dino e salvar nos posts default do wordpress
+# Plugin Dino V2
+Consume dino notifications and save in default wordpress posts
 
-######
+# Documentation
