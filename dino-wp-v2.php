@@ -9,7 +9,7 @@
   License: GPL2
  */
 
-include_once "curl.php"; 
+include_once "curl.php";
 
 function uploadRemoteImageAndAttach($image_url, $parent_id) {
     $image = $image_url;
