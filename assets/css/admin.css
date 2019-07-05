@@ -22,3 +22,16 @@
   list-style: none !important;
 }
 
+.wrap-dino-plugin-admin form .checks-images {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+.wrap-dino-plugin-admin form .item-check {
+  display: flex;
+}
+
+.wrap-dino-plugin-admin form .item-check input {
+  margin-top: 2px;
+}
