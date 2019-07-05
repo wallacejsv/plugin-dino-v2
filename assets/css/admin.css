@@ -1,0 +1,24 @@
+.wrap-dino-plugin-admin form {
+  margin-top: 20px;
+}
+
+.wrap-dino-plugin-admin form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.posts-dino {
+
+}
+
+.posts-dino ul {
+  
+}
+
+.posts-dino ul li {
+  margin-top: 20px;
+  list-style: none !important;
+}
+

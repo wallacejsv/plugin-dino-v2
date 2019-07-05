@@ -1,0 +1,258 @@
+<?php
+/*
+  Plugin Name: DINO WP v2
+  Plugin URI: http://www.dino.com.br
+  Description: Ferramenta para visualização dea notícias distribuídas pelo DINO - Visibilidade Online.
+  Version: 3.0
+  Author: DINO
+  Author URI: http://www.dino.com.br
+  License: GPL2
+ */
+
+include_once "curl.php";
+
+function uploadRemoteImageAndAttach($image_url, $parent_id) {
+    $image = $image_url;
+    $get = wp_remote_get($image);
+    $type = wp_remote_retrieve_header($get, 'content-type');
+    $mirror = wp_upload_bits( basename( $image ), '', wp_remote_retrieve_body( $get ) );
+
+    $filename = $mirror['file'];
+    $filetype = wp_check_filetype( basename( $filename ), null );
+
+    $wp_upload_dir = wp_upload_dir();
+
+    $attachment = array(
+        'guid'           => $wp_upload_dir['url'] . '/' . basename( $filename ), 
+        'post_mime_type' => $filetype['type'],
+        'post_title'     => preg_replace( '/\.[^.]+$/', '', basename( $filename ) ),
+        'post_content'   => '',
+        'post_status'    => 'inherit'
+    );
+
+    $attach_id = wp_insert_attachment( $attachment, $filename, $parent_id );
+
+    require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+    $attach_data = wp_generate_attachment_metadata( $attach_id, $filename );
+    wp_update_attachment_metadata( $attach_id, $attach_data );
+    set_post_thumbnail( $parent_id, $attach_id );
+}
+
+
+//insert news dino in table wp_posts
+function insert_posts() {
+    require_once(ABSPATH . 'wp-admin/includes/taxonomy.php'); 
+
+    global $wpdb;
+    global $wp_roles;
+    global $post;
+    global $wp_query;
+
+    $cat_id = get_cat_ID( 'Dino' );
+
+    //get notícia partner
+    $partner_id = get_option('dino_plugin_id');
+    $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=50pageIndex=1";
+    $json = dino_file_get_contents($urlWithPartner);
+    $result = json_decode($json);
+
+    if (isset($result->Items)) {
+        $cont = 0;
+        foreach ($result->Items as $item) {
+            $title = $item->Title;
+            $body = $item->Body;
+            $summary = $item->Summary;
+            $releaseId = $item->ReleaseId;
+            $imageRelease = $item->Image != null ? $item->Image->Url : "";
+            $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
+            $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
+
+
+            //remove spaces title
+            $titleTrim = trim($title);
+
+            //check if the api release is in the wp_posts table
+            $post_if = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
+
+            $post_if_page_news = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%Notícias corporativas%'");
+
+            //if you do not have the release in the base wp_posts insert it
+            if($post_if < 1){
+                $response = (object) array();
+                $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
+
+                //$response->id = $post_temp;   
+                $tmp = get_post( $post_temp );
+
+                //add release id ao post wp
+                add_post_meta( $tmp->ID, 'idRelease', $releaseId );
+
+                //add image ao post wp
+                uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
+                
+            }
+        }
+        wp_reset_postdata();
+    }
+}
+//add_action('init', 'insert_posts');
+
+// cron get news api avery 1 hour
+add_action( 'init', function () { 
+    if( ! wp_next_scheduled( 'expire_cpt2' ) ) { 
+        wp_schedule_event( time(), 'hourly', 'expire_cpt2' ); 
+    } 
+    add_action( 'expire_cpt2', 'insert_posts' ); 
+});
+
+//create page noticias-corporativas
+function createPageDino(){
+
+    $page = array(
+        'post_title' => wp_strip_all_tags( 'Notícias corporativas' ),
+        'post_status' => 'publish',
+        'post_type' => 'page',
+        'post_content' => do_shortcode("[get-posts-dino]")
+    );
+
+    // $newvalue = wp_insert_post( $page, false );
+    // update_option( 'page-news-dino', $newvalue );
+    wp_insert_post($page);
+}
+
+//create table dino news with releases
+register_activation_hook ( __FILE__, 'on_activate' );
+function on_activate() {
+    wp_create_category('Dino');
+    createPageDino();
+}
+
+register_deactivation_hook( __FILE__, 'deactivate_plugin' );
+function deactivate_plugin() {
+    $page_id =  wt_get_ID_by_page_name('noticias-corporativas');
+    wp_delete_post($page_id);
+}
+
+function admin_js() {
+    wp_enqueue_script('admin-js', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)));
+    wp_enqueue_style('admin-css', plugins_url('dino-wp-v2/assets/css/admin.css', dirname(__FILE__)));
+}
+add_action('admin_enqueue_scripts', 'admin_js');
+
+//add canonical noticias dino
+function add_canonical_head() {
+    global $post;
+    if(!is_home()) { ?>
+        <link rel="canonical" href="<?php echo "//noticias.dino.com.br/" . $post->post_name; ?>" />
+    <?php }
+}
+remove_action('wp_head', 'rel_canonical');
+add_action('wp_head', 'add_canonical_head', 1);
+
+//add posts in shortcode
+function get_some_posts($atts) {
+    $cat_id = get_cat_ID( 'Dino' );
+
+    $a = shortcode_atts([
+      'post_type' => 'post',
+      'cat' => $cat_id,
+      'posts_per_page' => 10
+    ], $atts);
+
+
+    $myposts = get_posts( array(
+        'posts_per_page' => -1,
+        'offset'         => 1,
+        'category'       => $cat_id
+    ) );
+
+    $attachments = get_posts( array(
+        'post_type'      => 'attachment',
+        'posts_per_page' => -1,
+        'post_status'    => 'any',
+        'post_parent'    => $post->ID
+    ) );
+ 
+    if ( $myposts ) {
+        foreach ( $myposts as $post ) :
+            setup_postdata( $post );
+            ?>
+            <div class="posts-dino">
+                <uL>
+                    <li>
+                        <a href="<?php echo $post->guid; ?>"><?php echo $post->post_title; ?></a>
+                    </li>
+                </ul>
+            </div>
+        <?php
+        endforeach; 
+        wp_reset_postdata();
+    }
+
+    
+    // $the_query = new WP_Query( $a );
+
+    // if ( $the_query->have_posts() ) {
+
+    //     $string .= '<ul>';
+    //     while ( $the_query->have_posts() ) {
+    //         $the_query->the_post();
+    //         $string .= '
+    //         <li>
+    //             <a href="' . get_permalink() . '">' . get_the_title() . '</a>
+    //         </li>';
+    //     }
+    //     wp_reset_postdata();
+    //     $string .= '</ul>';
+
+    // } else {
+    //     $string .= 'no posts found';
+    // }
+
+    return $string;
+}
+  
+function shortcodes_init() {
+    add_shortcode('get-posts-dino','get_some_posts');
+}
+add_action('init', 'shortcodes_init');
+
+if(is_admin()) {
+    add_action('admin_menu', 'admin_dino_menu');
+    add_action ('admin_init', 'register_mysettings');
+}
+function admin_dino_menu() {
+    add_options_page('Dino Admin Options', "DINO - Notícias", 'manage_options', 'dino-admin', 'dino_admin_menu_options');
+}
+
+function dino_admin_menu_options(){
+    if(!current_user_can('manage_options')) {
+        wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
+    }
+    form_admin();
+}
+
+function register_mysettings() {
+    register_setting ('dino_option_group', 'dino_plugin_id');
+}
+
+function form_admin() { ?>
+    <div class="wrap wrap-dino-plugin-admin">
+        <h2>DINO - Configurações</h2>
+        <form method="post" action="options.php">
+            <?php settings_fields('dino_option_group'); ?>
+            <label>ID parceiro:</label>
+            <input type="text" name="dino_plugin_id" value="<?php echo esc_attr(get_option('dino_plugin_id')); ?>">
+            <?php submit_button(); ?>
+        </form>
+    </div>
+<?php
+}
+
+function wt_get_ID_by_page_name($page_name)
+{
+	global $wpdb;
+	$page_name_id = $wpdb->get_var("SELECT ID FROM $wpdb->posts WHERE post_name = '".$page_name."'");
+	return $page_name_id;
+}
