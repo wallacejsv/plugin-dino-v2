@@ -53,48 +53,72 @@ function insert_posts() {
 
     //get notícia partner
     $partner_id = get_option('dino_plugin_id');
-    $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=50pageIndex=1";
-    $json = dino_file_get_contents($urlWithPartner);
-    $result = json_decode($json);
+    //get image partner
+    $partner_image = get_option('dino_plugin_image');
+    
+    if($partner_id != "") {
+        $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=100pageIndex=1";
+        $json = dino_file_get_contents($urlWithPartner);
+        $result = json_decode($json);
 
-    if (isset($result->Items)) {
-        $cont = 0;
-        foreach ($result->Items as $item) {
-            $title = $item->Title;
-            $body = $item->Body;
-            $summary = $item->Summary;
-            $releaseId = $item->ReleaseId;
-            $imageRelease = $item->Image != null ? $item->Image->Url : "";
-            $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
-            $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
+        if (isset($result->Items)) {
+            $cont = 0;
+            foreach ($result->Items as $item) {
+                $title = $item->Title;
+                $body = $item->Body;
+                $summary = $item->Summary;
+                $releaseId = $item->ReleaseId;
+                $imageRelease = $item->Image != null ? $item->Image->Url : "";
+                $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
+                $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
+    
+                //remove spaces title
+                $titleTrim = trim($title);
+    
+                //check if the api release is in the wp_posts table
+                $post_if = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
+                
+                $post_if_page_news = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%Notícias corporativas%'");
+                //if you do not have the release in the base wp_posts insert it
 
+                if($partner_image == "image" && $item->Image != null) {
+                    if($post_if < 1){
+                        $response = (object) array();
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
+        
+                        //$response->id = $post_temp;   
+                        $tmp = get_post( $post_temp );
+        
+                        //add release id ao post wp
+                        add_post_meta( $tmp->ID, 'idRelease', $releaseId );
+        
+                        //add image ao post wp
+                        uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
+                    }
+                }
+                if($partner_image == "noimage" || !$partner_image) {
+                    if($post_if < 1){
+                        $response = (object) array();
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
+        
+                        //$response->id = $post_temp;   
+                        $tmp = get_post( $post_temp );
+        
+                        //add release id ao post wp
+                        add_post_meta( $tmp->ID, 'idRelease', $releaseId );
+        
+                        //add image ao post wp
+                        uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
+                    }
+                }
 
-            //remove spaces title
-            $titleTrim = trim($title);
-
-            //check if the api release is in the wp_posts table
-            $post_if = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
-
-            $post_if_page_news = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%Notícias corporativas%'");
-
-            //if you do not have the release in the base wp_posts insert it
-            if($post_if < 1){
-                $response = (object) array();
-                $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
-
-                //$response->id = $post_temp;   
-                $tmp = get_post( $post_temp );
-
-                //add release id ao post wp
-                add_post_meta( $tmp->ID, 'idRelease', $releaseId );
-
-                //add image ao post wp
-                uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
                 
             }
+            wp_reset_postdata();
         }
-        wp_reset_postdata();
-    }
+    } else { ?>
+        <script>alert("Vá em configurações - DINO Notícias e preencha o campo 'ID Parceiro'");</script>
+    <?php }
 }
 //add_action('init', 'insert_posts');
 
@@ -153,13 +177,13 @@ add_action('wp_head', 'add_canonical_head', 1);
 //add posts in shortcode
 function get_some_posts($atts) {
     $cat_id = get_cat_ID( 'Dino' );
+    global $post;
 
     $a = shortcode_atts([
       'post_type' => 'post',
       'cat' => $cat_id,
       'posts_per_page' => 10
     ], $atts);
-
 
     $myposts = get_posts( array(
         'posts_per_page' => -1,
@@ -189,28 +213,6 @@ function get_some_posts($atts) {
         endforeach; 
         wp_reset_postdata();
     }
-
-    
-    // $the_query = new WP_Query( $a );
-
-    // if ( $the_query->have_posts() ) {
-
-    //     $string .= '<ul>';
-    //     while ( $the_query->have_posts() ) {
-    //         $the_query->the_post();
-    //         $string .= '
-    //         <li>
-    //             <a href="' . get_permalink() . '">' . get_the_title() . '</a>
-    //         </li>';
-    //     }
-    //     wp_reset_postdata();
-    //     $string .= '</ul>';
-
-    // } else {
-    //     $string .= 'no posts found';
-    // }
-
-    return $string;
 }
   
 function shortcodes_init() {
@@ -235,6 +237,7 @@ function dino_admin_menu_options(){
 
 function register_mysettings() {
     register_setting ('dino_option_group', 'dino_plugin_id');
+    register_setting('dino_option_image', 'dino_plugin_image');
 }
 
 function form_admin() { ?>
@@ -242,14 +245,27 @@ function form_admin() { ?>
         <h2>DINO - Configurações</h2>
         <form method="post" action="options.php">
             <?php settings_fields('dino_option_group'); ?>
+            <?php settings_fields('dino_option_image'); ?>
             <label>ID parceiro:</label>
+            
             <input type="text" name="dino_plugin_id" value="<?php echo esc_attr(get_option('dino_plugin_id')); ?>">
+            <div class="checks-images">
+                <div class="item-check">
+                    <input type="radio" name="dino_plugin_image" value="image" <?php echo get_option('dino_plugin_image') != "" && get_option('dino_plugin_image') == "image" ? "checked" : "" ?>>
+                    <label for="huey">Receber notícias somente com imagens</label>
+                </div>
+                <div class="item-check">
+                    <input type="radio" name="dino_plugin_image" value="noimage" <?php echo get_option('dino_plugin_image') != "" && get_option('dino_plugin_image') == "noimage" ? "checked" : "" ?>>
+                    <label for="huey">Receber notícias com imagens e sem imagens</label>
+                </div>
+            </div>
             <?php submit_button(); ?>
         </form>
     </div>
 <?php
 }
 
+//delete page noticias-corporativas deactive plugin dino
 function wt_get_ID_by_page_name($page_name)
 {
 	global $wpdb;
