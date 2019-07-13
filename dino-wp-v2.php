@@ -41,7 +41,7 @@ function uploadRemoteImageAndAttach($image_url, $parent_id) {
 
 
 //insert news dino in table wp_posts
-function insert_posts() {
+function insert_posts($cat_id) {
     require_once(ABSPATH . 'wp-admin/includes/taxonomy.php'); 
 
     global $wpdb;
@@ -49,7 +49,14 @@ function insert_posts() {
     global $post;
     global $wp_query;
 
-    $cat_id = get_cat_ID( 'Dino' );
+    $slug_admin_category = get_option('dino_plugin_slug_news');
+    // $cat_id = get_option('dino_plugin_category_id2');
+    // $cat_id = get_cat_ID('Notícias corporativas');
+    
+    wp_update_term($cat_id, 'category', array(
+        'name' => $slug_admin_category,
+        'slug' => $slug_admin_category,
+    ));
 
     //get notícia partner
     $partner_id = get_option('dino_plugin_id');
@@ -57,7 +64,7 @@ function insert_posts() {
     $partner_image = get_option('dino_plugin_image');
     
     if($partner_id != "") {
-        $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=100pageIndex=1";
+        $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=5";
         $json = dino_file_get_contents($urlWithPartner);
         $result = json_decode($json);
 
@@ -84,7 +91,7 @@ function insert_posts() {
                 if($partner_image == "image" && $item->Image != null) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId ) );
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -99,7 +106,7 @@ function insert_posts() {
                 if($partner_image == "noimage" || !$partner_image) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => 'dino/'.$titleTrim.'/releaseid/'.$releaseId ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId ) );
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -120,15 +127,31 @@ function insert_posts() {
         <script>alert("Vá em configurações - DINO Notícias e preencha o campo 'ID Parceiro'");</script>
     <?php }
 }
-//add_action('init', 'insert_posts');
 
-// cron get news api avery 1 hour
+function my_cron_schedules($schedules){
+    if(!isset($schedules["20min"])){
+        $schedules["20min"] = array(
+            'interval' => 20*60,
+            'display' => __('Once every 20 minutes'));
+    }
+    if(!isset($schedules["5m"])){
+        $schedules["5m"] = array(
+            'interval' => 5*60,
+            'display' => __('Once every 5 minutes'));
+    }
+    return $schedules;
+}
+add_filter('cron_schedules','my_cron_schedules');
+
+// add_action('init', 'insert_posts');
+// cron get news api
 add_action( 'init', function () { 
-    if( ! wp_next_scheduled( 'expire_cpt2' ) ) { 
-        wp_schedule_event( time(), 'hourly', 'expire_cpt2' ); 
-    } 
-    add_action( 'expire_cpt2', 'insert_posts' ); 
+    // if( !wp_next_scheduled( 'expire_5m_min' ) ) { 
+        wp_schedule_event( time(), '5m', 'expire_5m_min' ); 
+    // } 
+    add_action( 'expire_5m_min', 'insert_posts' ); 
 });
+
 
 //create page noticias-corporativas
 function createPageDino(){
@@ -140,27 +163,35 @@ function createPageDino(){
         'post_content' => do_shortcode("[get-posts-dino]")
     );
 
-    // $newvalue = wp_insert_post( $page, false );
-    // update_option( 'page-news-dino', $newvalue );
     wp_insert_post($page);
 }
 
 //create table dino news with releases
 register_activation_hook ( __FILE__, 'on_activate' );
 function on_activate() {
-    wp_create_category('Dino');
-    createPageDino();
+    wp_create_category("Notícias corporativas");
 }
 
 register_deactivation_hook( __FILE__, 'deactivate_plugin' );
 function deactivate_plugin() {
-    $page_id =  wt_get_ID_by_page_name('noticias-corporativas');
-    wp_delete_post($page_id);
+
 }
 
 function admin_js() {
     wp_enqueue_script('admin-js', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)));
     wp_enqueue_style('admin-css', plugins_url('dino-wp-v2/assets/css/admin.css', dirname(__FILE__)));
+
+    wp_register_script( 'plugin_dino_script_php', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)) );
+    wp_enqueue_script( 'plugin_dino_script_php');
+
+    $id_category_options2 = get_option('dino_plugin_category_id2');
+    $arrayData = array(
+        'id_category_dino_slug' => get_cat_slug($id_category_options2),
+        'id_category_dino' => $id_category_options2,
+    );
+
+    //Realizo a chamada ao método.
+    wp_localize_script('plugin_dino_script_php', 'objeto_javascript', $arrayData);
 }
 add_action('admin_enqueue_scripts', 'admin_js');
 
@@ -237,7 +268,10 @@ function dino_admin_menu_options(){
 
 function register_mysettings() {
     register_setting ('dino_option_group', 'dino_plugin_id');
-    register_setting('dino_option_image', 'dino_plugin_image');
+    register_setting('dino_option_group', 'dino_plugin_image');
+    register_setting('dino_option_group', 'dino_plugin_slug_news');
+    register_setting('dino_option_group', 'dino_plugin_category_id');
+    register_setting('dino_option_group', 'dino_plugin_category_id2');
 }
 
 function form_admin() { ?>
@@ -245,30 +279,57 @@ function form_admin() { ?>
         <h2>DINO - Configurações</h2>
         <form method="post" action="options.php">
             <?php settings_fields('dino_option_group'); ?>
-            <?php settings_fields('dino_option_image'); ?>
+
+            <?php 
+            // $cat_id = get_cat_ID('Notícias corporativas');
+            $id_category = get_cat_ID('Notícias corporativas');
+
+            $slug_admin_category = get_option('dino_plugin_slug_news');
+            $id_category_options = get_option('dino_plugin_category_id');
+            $id_category_options2 = get_option('dino_plugin_category_id2');
+            if ($slug_admin_category != "") {
+                $id_category = get_option('dino_plugin_category_id2');
+                wp_update_term($id_category, 'category', array(
+                    'name' => $slug_admin_category,
+                    'slug' => $slug_admin_category,
+                ));
+            }
+
+            insert_posts($id_category);
+            ?>
+             <input type="hidden" name="dino_plugin_category_id" value="<?php echo esc_attr($id_category_options); ?>">
+             <input type="hidden" name="dino_plugin_category_id2" value="<?php echo esc_attr($id_category); ?>">
+
             <label>ID parceiro:</label>
             
             <input type="text" name="dino_plugin_id" value="<?php echo esc_attr(get_option('dino_plugin_id')); ?>">
+            <br />
+            <br />
+            <label>Nome da página com as nototícias dino</label>
+
+            <input type="text" name="dino_plugin_slug_news" value="<?php echo esc_attr(get_option('dino_plugin_slug_news')); ?>">
+
             <div class="checks-images">
                 <div class="item-check">
-                    <input type="radio" name="dino_plugin_image" value="image" <?php echo get_option('dino_plugin_image') != "" && get_option('dino_plugin_image') == "image" ? "checked" : "" ?>>
-                    <label for="huey">Receber notícias somente com imagens</label>
+                    <input type="radio" name="dino_plugin_image" value="image" class="com-imagem-dino" <?php echo get_option('dino_plugin_image') != "" && get_option('dino_plugin_image') == "image" ? "checked" : "" ?>>
+                    <label>Receber notícias somente com imagens</label>
                 </div>
                 <div class="item-check">
                     <input type="radio" name="dino_plugin_image" value="noimage" <?php echo get_option('dino_plugin_image') != "" && get_option('dino_plugin_image') == "noimage" ? "checked" : "" ?>>
-                    <label for="huey">Receber notícias com imagens e sem imagens</label>
+                    <label>Receber notícias com imagens e sem imagens</label>
                 </div>
             </div>
+            
+            
             <?php submit_button(); ?>
+            
         </form>
     </div>
 <?php
 }
 
-//delete page noticias-corporativas deactive plugin dino
-function wt_get_ID_by_page_name($page_name)
-{
-	global $wpdb;
-	$page_name_id = $wpdb->get_var("SELECT ID FROM $wpdb->posts WHERE post_name = '".$page_name."'");
-	return $page_name_id;
+function get_cat_slug($cat_id) {
+	$cat_id = (int) $cat_id;
+	$category = get_category($cat_id);
+	return $category->slug;
 }
