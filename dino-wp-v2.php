@@ -50,8 +50,6 @@ function insert_posts($cat_id) {
     global $wp_query;
 
     $slug_admin_category = get_option('dino_plugin_slug_news');
-    // $cat_id = get_option('dino_plugin_category_id2');
-    // $cat_id = get_cat_ID('Notícias corporativas');
     
     wp_update_term($cat_id, 'category', array(
         'name' => $slug_admin_category,
@@ -128,30 +126,28 @@ function insert_posts($cat_id) {
     <?php }
 }
 
-function my_cron_schedules($schedules){
-    if(!isset($schedules["20min"])){
-        $schedules["20min"] = array(
-            'interval' => 20*60,
-            'display' => __('Once every 20 minutes'));
-    }
-    if(!isset($schedules["5m"])){
-        $schedules["5m"] = array(
-            'interval' => 5*60,
-            'display' => __('Once every 5 minutes'));
-    }
+function isa_add_cron_recurrence_interval( $schedules ) {
+ 
+    $schedules['every_three_minutes'] = array(
+        'interval'  => 180,
+        'display'   => __( 'Every 3 Minutes', 'textdomain' )
+    );
+ 
+    $schedules['every_fifteen_minutes'] = array(
+        'interval'  => 900,
+        'display'   => __( 'Every 15 Minutes', 'textdomain' )
+    );  
+     
     return $schedules;
 }
-add_filter('cron_schedules','my_cron_schedules');
+add_filter( 'cron_schedules', 'isa_add_cron_recurrence_interval' );
 
 // add_action('init', 'insert_posts');
 // cron get news api
-add_action( 'init', function () { 
-    // if( !wp_next_scheduled( 'expire_5m_min' ) ) { 
-        wp_schedule_event( time(), '5m', 'expire_5m_min' ); 
-    // } 
-    add_action( 'expire_5m_min', 'insert_posts' ); 
-});
-
+if ( !wp_next_scheduled( 'your_three_minute_action_hook' ) ) {
+    wp_schedule_event( time(), 'every_three_minutes', 'your_three_minute_action_hook' );
+} 
+add_action( 'your_three_minute_action_hook', 'insert_posts' );
 
 //create page noticias-corporativas
 function createPageDino(){
@@ -177,6 +173,12 @@ function deactivate_plugin() {
 
 }
 
+function get_cat_slug($cat_id) {
+	$cat_id = (int) $cat_id;
+    $category = get_category($cat_id);
+    return $category->slug;
+}
+
 function admin_js() {
     wp_enqueue_script('admin-js', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)));
     wp_enqueue_style('admin-css', plugins_url('dino-wp-v2/assets/css/admin.css', dirname(__FILE__)));
@@ -184,10 +186,10 @@ function admin_js() {
     wp_register_script( 'plugin_dino_script_php', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)) );
     wp_enqueue_script( 'plugin_dino_script_php');
 
-    $id_category_options2 = get_option('dino_plugin_category_id2');
+    $id_category_options = get_option('dino_plugin_category_id');
     $arrayData = array(
-        'id_category_dino_slug' => get_cat_slug($id_category_options2),
-        'id_category_dino' => $id_category_options2,
+        'id_category_dino_slug' => get_cat_slug($id_category_options),
+        'id_category_dino' => $id_category_options,
     );
 
     //Realizo a chamada ao método.
@@ -271,7 +273,6 @@ function register_mysettings() {
     register_setting('dino_option_group', 'dino_plugin_image');
     register_setting('dino_option_group', 'dino_plugin_slug_news');
     register_setting('dino_option_group', 'dino_plugin_category_id');
-    register_setting('dino_option_group', 'dino_plugin_category_id2');
 }
 
 function form_admin() { ?>
@@ -281,14 +282,13 @@ function form_admin() { ?>
             <?php settings_fields('dino_option_group'); ?>
 
             <?php 
-            // $cat_id = get_cat_ID('Notícias corporativas');
             $id_category = get_cat_ID('Notícias corporativas');
 
             $slug_admin_category = get_option('dino_plugin_slug_news');
             $id_category_options = get_option('dino_plugin_category_id');
-            $id_category_options2 = get_option('dino_plugin_category_id2');
+
             if ($slug_admin_category != "") {
-                $id_category = get_option('dino_plugin_category_id2');
+                $id_category = get_option('dino_plugin_category_id');
                 wp_update_term($id_category, 'category', array(
                     'name' => $slug_admin_category,
                     'slug' => $slug_admin_category,
@@ -297,8 +297,7 @@ function form_admin() { ?>
 
             insert_posts($id_category);
             ?>
-             <input type="hidden" name="dino_plugin_category_id" value="<?php echo esc_attr($id_category_options); ?>">
-             <input type="hidden" name="dino_plugin_category_id2" value="<?php echo esc_attr($id_category); ?>">
+             <input type="hidden" name="dino_plugin_category_id" value="<?php echo esc_attr($id_category); ?>">
 
             <label>ID parceiro:</label>
             
@@ -328,8 +327,3 @@ function form_admin() { ?>
 <?php
 }
 
-function get_cat_slug($cat_id) {
-	$cat_id = (int) $cat_id;
-	$category = get_category($cat_id);
-	return $category->slug;
-}
