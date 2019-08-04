@@ -39,9 +39,8 @@ function uploadRemoteImageAndAttach($image_url, $parent_id) {
     set_post_thumbnail( $parent_id, $attach_id );
 }
 
-
 //insert news dino in table wp_posts
-function insert_posts($cat_id) {
+function insert_posts($cat_id, $pageSize = 10) {
     require_once(ABSPATH . 'wp-admin/includes/taxonomy.php'); 
 
     global $wpdb;
@@ -49,8 +48,9 @@ function insert_posts($cat_id) {
     global $post;
     global $wp_query;
 
+    $cat_id = get_option('dino_plugin_category_id');
+
     $slug_admin_category = get_option('dino_plugin_slug_news');
-    
     wp_update_term($cat_id, 'category', array(
         'name' => $slug_admin_category,
         'slug' => $slug_admin_category,
@@ -62,7 +62,7 @@ function insert_posts($cat_id) {
     $partner_image = get_option('dino_plugin_image');
     
     if($partner_id != "") {
-        $urlWithPartner = "http://api.dino.com.br/v2/news/".$partner_id."/?pagesize=5";
+        $urlWithPartner = "https://api.dino.com.br/v2/news/".$partner_id."/?pagesize=".$pageSize;
         $json = dino_file_get_contents($urlWithPartner);
         $result = json_decode($json);
 
@@ -76,20 +76,23 @@ function insert_posts($cat_id) {
                 $imageRelease = $item->Image != null ? $item->Image->Url : "";
                 $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
                 $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
-    
+                $date = $item->PublishedDate;
                 //remove spaces title
                 $titleTrim = trim($title);
     
                 //check if the api release is in the wp_posts table
                 $post_if = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
+
+                $post_if_id = $wpdb->get_var("SELECT count(ID) FROM $wpdb->posts WHERE post_name like '%$releaseId%'");
                 
                 $post_if_page_news = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%Notícias corporativas%'");
                 //if you do not have the release in the base wp_posts insert it
 
+                
                 if($partner_image == "image" && $item->Image != null) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -99,12 +102,12 @@ function insert_posts($cat_id) {
         
                         //add image ao post wp
                         uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
-                    }
+                    } 
                 }
                 if($partner_image == "noimage" || !$partner_image) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ) );
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -122,7 +125,7 @@ function insert_posts($cat_id) {
             wp_reset_postdata();
         }
     } else { ?>
-        <script>alert("Vá em configurações - DINO Notícias e preencha o campo 'ID Parceiro'");</script>
+        <!-- <script>alert("Vá em configurações - DINO Notícias e preencha o campo 'ID Parceiro'");</script> -->
     <?php }
 }
 
@@ -142,12 +145,75 @@ function isa_add_cron_recurrence_interval( $schedules ) {
 }
 add_filter( 'cron_schedules', 'isa_add_cron_recurrence_interval' );
 
-// add_action('init', 'insert_posts');
 // cron get news api
 if ( !wp_next_scheduled( 'your_three_minute_action_hook' ) ) {
-    wp_schedule_event( time(), 'every_three_minutes', 'your_three_minute_action_hook' );
+    wp_schedule_event( time(), 'every_fifteen_minutes', 'your_three_minute_action_hook' );
 } 
 add_action( 'your_three_minute_action_hook', 'insert_posts' );
+
+function load_posts_not_exists($query) {
+    global $wp_query;
+    global $wpdb;
+    global $wp_roles;
+    global $post;
+    
+
+    if($wp_query->is_single) {
+        
+        $partner_id = get_option('dino_plugin_id');
+        if($partner_id != "") {
+            $postName = $wp_query->query['name'];
+
+            $postNameSplitArray = preg_split("/\-/", $postName);
+            
+            $post_if = $wpdb->get_var("SELECT COUNT(post_name) FROM $wpdb->posts WHERE post_name like '%$postName%'");
+            if ($post_if == '0') {
+
+                // $releaseId = substr($postName, -6); 
+                $releaseId = end($postNameSplitArray);
+                
+                $url = "https://api.dino.com.br/v2/news/" . $releaseId . "/dino";
+                $json = dino_file_get_contents($url);
+                $result = json_decode($json);
+                $montaNoticia = $result->Item;
+                
+                $title = $montaNoticia->Title;
+                $titleTrim = trim($title);
+                $body = $montaNoticia->Body;
+                $summary = $montaNoticia->Summary;
+                $date = $montaNoticia->PublishedDate;
+
+                $imageRelease = $montaNoticia->Image->Url != null ? $montaNoticia->Image->Url : "";
+                $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
+                $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
+                
+                $cat_id = get_option('dino_plugin_category_id');
+
+                $post_if_old = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
+                // var_dump($post_if_old);
+                // var_dump($titleTrim);
+
+                if($post_if_old == '0') {
+                    if(!is_admin() && $query->is_main_query()) {
+                        // var_dump("inseriu");
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
+
+                        //$response->id = $post_temp;   
+                        $tmp = get_post( $post_temp );
+                
+                        //add release id ao post wp
+                        add_post_meta( $tmp->ID, 'idRelease', $releaseId );
+
+                        //add image ao post wp
+                        uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
+                    }
+                }
+            }
+        }
+    }
+}
+
+add_action('pre_get_posts', 'load_posts_not_exists');
 
 //create page noticias-corporativas
 function createPageDino(){
@@ -166,11 +232,14 @@ function createPageDino(){
 register_activation_hook ( __FILE__, 'on_activate' );
 function on_activate() {
     wp_create_category("Notícias corporativas");
+    // $id_category = get_cat_ID('Notícias corporativas');
+    // insert_posts($id_category, 50);
 }
 
 register_deactivation_hook( __FILE__, 'deactivate_plugin' );
 function deactivate_plugin() {
-
+    $id_category = get_cat_ID('Notícias corporativas');
+    wp_delete_category( $id_category );
 }
 
 function get_cat_slug($cat_id) {
@@ -278,6 +347,13 @@ function register_mysettings() {
 function form_admin() { ?>
     <div class="wrap wrap-dino-plugin-admin">
         <h2>DINO - Configurações</h2>
+        <h3 class="message">"Essa página de configuração carrega uma grande quantidade de notícias, com isso ela pode se tornar mais lenta."</h3>
+
+        <div class="preload">
+            <img src="http://institucional.dino.com.br/wp-content/themes/osum-by-honryou/assets/images/gif-icone-logo-dino.gif"/>
+            <p>Isso pode levar alguns minutos.<br> Estamos pegando as notícias para seu site.</p>
+        </div>
+
         <form method="post" action="options.php">
             <?php settings_fields('dino_option_group'); ?>
 
@@ -295,7 +371,7 @@ function form_admin() { ?>
                 ));
             }
 
-            insert_posts($id_category);
+            insert_posts($id_category, 50);
             ?>
              <input type="hidden" name="dino_plugin_category_id" value="<?php echo esc_attr($id_category); ?>">
 
