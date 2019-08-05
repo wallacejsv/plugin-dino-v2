@@ -92,7 +92,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                 if($partner_image == "image" && $item->Image != null) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
+                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -107,7 +107,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                 if($partner_image == "noimage" || !$partner_image) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ) );
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -130,24 +130,21 @@ function insert_posts($cat_id, $pageSize = 10) {
 }
 
 function isa_add_cron_recurrence_interval( $schedules ) {
- 
-    $schedules['every_three_minutes'] = array(
+    $schedules['teste_60_segundos'] = array(
         'interval'  => 180,
         'display'   => __( 'Every 3 Minutes', 'textdomain' )
     );
- 
-    $schedules['every_fifteen_minutes'] = array(
-        'interval'  => 900,
-        'display'   => __( 'Every 15 Minutes', 'textdomain' )
-    );  
-     
+    // $schedules['every_fifteen_minutes'] = array(
+    //     'interval'  => 900,
+    //     'display'   => __( 'Every 15 Minutes', 'textdomain' )
+    // );  
     return $schedules;
 }
 add_filter( 'cron_schedules', 'isa_add_cron_recurrence_interval' );
 
 // cron get news api
 if ( !wp_next_scheduled( 'your_three_minute_action_hook' ) ) {
-    wp_schedule_event( time(), 'every_fifteen_minutes', 'your_three_minute_action_hook' );
+    wp_schedule_event( time(), 'teste_60_segundos', 'your_three_minute_action_hook' );
 } 
 add_action( 'your_three_minute_action_hook', 'insert_posts' );
 
@@ -196,7 +193,7 @@ function load_posts_not_exists($query) {
                 if($post_if_old == '0') {
                     if(!is_admin() && $query->is_main_query()) {
                         // var_dump("inseriu");
-                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
+                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
 
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
