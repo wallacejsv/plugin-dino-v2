@@ -43,7 +43,8 @@ function update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $d
     if($isChange) {
         $post_update = array(
             'ID'           => $tmp->ID,
-            'post_title'   => $title . "<img src='#'>",
+            // 'post_title'   => $title . "<img src='#'>",
+            'post_title'   => $title,
             'post_content' => $body,
             'post_status' => 'publish',
             'post_type' => 'post',
@@ -116,7 +117,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                     if($post_if < 1){
                         
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -135,7 +136,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                 if($partner_image == "noimage" || !$partner_image) {
                     if($post_if < 1){
                         $response = (object) array();
-                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ) );
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ) );
         
                         //$response->id = $post_temp;   
                         $tmp = get_post( $post_temp );
@@ -224,7 +225,7 @@ function load_posts_not_exists($query) {
                 if($post_if_old == '0') {
                     if(!is_admin() && $query->is_main_query()) {
                         // var_dump("inseriu");
-                        $post_temp = wp_insert_post( array('post_title' => $title . "<img src='#'>", 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
+                        $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
 
                         $tmp = get_post( $post_temp );
                 
