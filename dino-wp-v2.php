@@ -343,10 +343,10 @@ function get_cat_slug($cat_id) {
 }
 
 function admin_js() {
-    wp_enqueue_script('admin-js', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)));
-    wp_enqueue_style('admin-css', plugins_url('dino-wp-v2/assets/css/admin.css', dirname(__FILE__)));
+    wp_enqueue_script('admin-js', plugins_url('plugin-dino-v2/assets/js/admin.js', dirname(__FILE__)));
+    wp_enqueue_style('admin-css', plugins_url('plugin-dino-v2/assets/css/admin.css', dirname(__FILE__)));
 
-    wp_register_script( 'plugin_dino_script_php', plugins_url('dino-wp-v2/assets/js/admin.js', dirname(__FILE__)) );
+    wp_register_script( 'plugin_dino_script_php', plugins_url('plugin-dino-v2/assets/js/admin.js', dirname(__FILE__)) );
     wp_enqueue_script( 'plugin_dino_script_php');
 
     $id_category_options = get_option('dino_plugin_category_id');
