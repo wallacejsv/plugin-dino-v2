@@ -161,20 +161,33 @@ function insert_posts($cat_id, $pageSize = 10) {
     <?php }
 }
 
-function isa_add_cron_recurrence_interval( $schedules ) {
-    $schedules['get_news_3_times'] = array(
-        'interval'  => 180,
-        'display'   => __( 'Every 3 Minutes', 'textdomain' )
-    );
-    return $schedules;
-}
-add_filter( 'cron_schedules', 'isa_add_cron_recurrence_interval' );
 
-// cron get news api
-if ( !wp_next_scheduled( 'your_three_minute_action_hook' ) ) {
-    wp_schedule_event( time(), 'get_news_3_times', 'your_three_minute_action_hook' );
-} 
-add_action( 'your_three_minute_action_hook', 'insert_posts' );
+add_action('wp', 'myplugin_schedule_cron');
+function myplugin_schedule_cron() {
+  if ( !wp_next_scheduled( 'myplugin_cron' ) )
+    wp_schedule_event(time(), 'customTime2', 'myplugin_cron');
+}
+
+// the CRON hook for firing function
+add_action('myplugin_cron', 'myplugin_cron_function');
+// the actual function
+function myplugin_cron_function() {
+    $home_url = home_url();
+    wp_mail('w.vieira@dino.com.br','Cron Worked DINO - ' . $home_url, date('r'));
+    $id_category = get_cat_ID('Notícias corporativas');
+    insert_posts($id_category, 20);
+}
+
+add_filter('cron_schedules', 'myplugin_cron_add_intervals');
+function myplugin_cron_add_intervals( $schedules ) {
+  $schedules['customTime2'] = array(
+    'interval' => 600,
+    'display' => __('10 minutos cron')
+  );
+  return $schedules;
+}
+
+
 // add_action('init', 'insert_posts');
 
 function load_posts_not_exists($query) {
@@ -302,53 +315,8 @@ function add_canonical_head() {
     <?php }
 }
 remove_action('wp_head', 'rel_canonical');
-add_action('wp_head', 'add_canonical_head', 1);
+add_action('wp_head', 'add_canonical_head', 1);  
 
-//add posts in shortcode
-function get_some_posts($atts) {
-    $cat_id = get_cat_ID( 'Dino' );
-    global $post;
-
-    $a = shortcode_atts([
-      'post_type' => 'post',
-      'cat' => $cat_id,
-      'posts_per_page' => 10
-    ], $atts);
-
-    $myposts = get_posts( array(
-        'posts_per_page' => -1,
-        'offset'         => 1,
-        'category'       => $cat_id
-    ) );
-
-    $attachments = get_posts( array(
-        'post_type'      => 'attachment',
-        'posts_per_page' => -1,
-        'post_status'    => 'any',
-        'post_parent'    => $post->ID
-    ) );
- 
-    if ( $myposts ) {
-        foreach ( $myposts as $post ) :
-            setup_postdata( $post );
-            ?>
-            <div class="posts-dino">
-                <uL>
-                    <li>
-                        <a href="<?php echo $post->guid; ?>"><?php echo $post->post_title; ?></a>
-                    </li>
-                </ul>
-            </div>
-        <?php
-        endforeach; 
-        wp_reset_postdata();
-    }
-}
-  
-function shortcodes_init() {
-    add_shortcode('get-posts-dino','get_some_posts');
-}
-add_action('init', 'shortcodes_init');
 
 if(is_admin()) {
     add_action('admin_menu', 'admin_dino_menu');
@@ -377,7 +345,7 @@ function form_admin() { ?>
         <h2>DINO - Configurações</h2>
         <h3 class="message">"Essa página de configuração carrega uma grande quantidade de notícias, com isso ela pode se tornar mais lenta."</h3>
 
-        <div class="preload">
+        <div class="preload" style="display: none;">
             <img src="http://institucional.dino.com.br/wp-content/themes/osum-by-honryou/assets/images/gif-icone-logo-dino.gif"/>
             <p>Isso pode levar alguns minutos.<br> Estamos pegando as notícias para seu site.</p>
         </div>
@@ -399,7 +367,7 @@ function form_admin() { ?>
                 ));
             }
 
-            insert_posts($id_category, 50);
+            // insert_posts($id_category, 50);
             ?>
              <input type="hidden" name="dino_plugin_category_id" value="<?php echo esc_attr($id_category); ?>">
 
@@ -424,7 +392,7 @@ function form_admin() { ?>
             </div>
             
             
-            <?php submit_button("Salvar e carregar mais notícias"); ?>
+            <?php submit_button("Salvar"); ?>
             
         </form>
     </div>
