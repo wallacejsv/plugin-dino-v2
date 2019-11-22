@@ -39,10 +39,10 @@ function uploadRemoteImageAndAttach($image_url, $parent_id) {
     set_post_thumbnail( $parent_id, $attach_id );
 }
 
-function update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim) {
-    if($isChange) {
+function update_post_dino($id, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim) {
+    // if($isChange == 1 || $isChange == true) {
         $post_update = array(
-            'ID'           => $tmp->ID,
+            'ID'           => $id,
             // 'post_title'   => $title . "<img src='#'>",
             'post_title'   => $title,
             'post_content' => $body,
@@ -54,7 +54,7 @@ function update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $d
             'post_date' => $date
         );
         wp_update_post( $post_update );
-    }
+    // }
 }
 
 //insert news dino in table wp_posts
@@ -110,12 +110,11 @@ function insert_posts($cat_id, $pageSize = 10) {
                 $post_if_page_news = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%Notícias corporativas%'");
                 //if you do not have the release in the base wp_posts insert it
 
-                
 
                 if($partner_image == "image" && $item->Image != null) {
                    
                     if($post_if < 1){
-                        
+
                         $response = (object) array();
                         $post_temp = wp_insert_post( array('post_title' => $title, 'post_status' => 'publish', 'post_type' => 'post', 'post_content' => $place . ' ' .date('j/n/Y', strtotime($date)) . ' - ' . $quote . $body, 'post_excerpt' => $summary, 'post_category' => array($cat_id), 'post_name' => $titleTrim . '-' . $releaseId, 'post_date' => $date ));
         
@@ -129,7 +128,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                         uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
 
                         //update post if isAlterado true
-                        update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim);
+                        // update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim);
                     }
                 }
 
@@ -148,7 +147,7 @@ function insert_posts($cat_id, $pageSize = 10) {
                         uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
 
                         //update post if isAlterado true
-                        update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim);
+                        // update_post_dino($tmp, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim);
                     }
                 }
 
@@ -186,9 +185,62 @@ function myplugin_cron_add_intervals( $schedules ) {
   );
   return $schedules;
 }
-
-
 // add_action('init', 'insert_posts');
+
+
+function isAlterado($query) {
+    global $wp_query;
+    global $wpdb;
+    global $wp_roles;
+    global $post;
+
+    if($wp_query->is_single) {
+        
+        $partner_id = get_option('dino_plugin_id');
+        if($partner_id != "") {
+            $postName = $wp_query->query['name'];
+
+            $postNameSplitArray = preg_split("/\-/", $postName);
+
+            $releaseId = end($postNameSplitArray);
+            
+            $url = "api.dino.com.br/v4/news/" . $releaseId . "/dino";
+            $json = dino_file_get_contents($url);
+            $result = json_decode($json);
+            $montaNoticia = $result->Item;
+            
+            $title = $montaNoticia->Title;
+            $titleTrim = trim($title);
+            $body = $montaNoticia->Body;
+            $quote = $montaNoticia->Quote;
+            $summary = $montaNoticia->Summary;
+            $date = $montaNoticia->PublishedDate;
+
+            $imageRelease = $montaNoticia->Image->Url != null ? $montaNoticia->Image->Url : "";
+            $replaceImageQuality80 = str_replace("?quality=100&width=620", "?quality=80&width=620", $imageRelease);
+            $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
+
+            $place = $montaNoticia->Place;
+            $isChange = $montaNoticia->IsAlterado;
+
+            
+            
+            $cat_id = get_option('dino_plugin_category_id');
+
+            if(!is_admin() && $query->is_main_query()) {
+                if($isChange) {
+                    $post_wpdb = $wpdb->get_results('SELECT * FROM wp_posts WHERE post_name LIKE "%' . $releaseId . '%" AND post_status = "publish"'); 
+                    $id_single = (int) $post_wpdb[0]->ID;
+                    update_post_dino($id_single, $title, $body, $summary, $cat_id, $releaseId, $date, $isChange, $titleTrim);
+                }
+            }
+            
+        }
+    }
+    
+}
+add_action('pre_get_posts', 'isAlterado');
+
 
 function load_posts_not_exists($query) {
     global $wp_query;
@@ -228,13 +280,14 @@ function load_posts_not_exists($query) {
                 $replaceImage = str_replace("?quality=80&width=620", "", $replaceImageQuality80);
 
                 $place = $montaNoticia->Place;
+                $isChange = $montaNoticia->IsAlterado;
                 
                 $cat_id = get_option('dino_plugin_category_id');
 
                 $post_if_old = $wpdb->get_var("SELECT count(post_title) FROM $wpdb->posts WHERE post_title like '%$titleTrim%'");
                 // var_dump($post_if_old);
                 // var_dump($titleTrim);
-
+                
                 if($post_if_old == '0') {
                     if(!is_admin() && $query->is_main_query()) {
                         // var_dump("inseriu");
@@ -247,13 +300,13 @@ function load_posts_not_exists($query) {
 
                         //add image ao post wp
                         uploadRemoteImageAndAttach($replaceImage , $tmp->ID);
+                        
                     }
                 }
             }
         }
     }
 }
-
 add_action('pre_get_posts', 'load_posts_not_exists');
 
 //create page noticias-corporativas
