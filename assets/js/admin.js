@@ -7,8 +7,6 @@ jQuery(document).ready(function () {
     //block edit, delete, category dino
     jQuery(`#the-list tr#tag-${objeto_javascript.id_category_dino}`).css("pointer-events", "none");
 
-    console.log(id_category_dino_slug);
-
     jQuery(".com-imagem-dino").on("click", function(){
         alert("Os próximos conteúdos serão apenas com imagens. Para os anteriores, não haverá alteração.");
     });
